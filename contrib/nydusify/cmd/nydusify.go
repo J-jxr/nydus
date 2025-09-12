@@ -15,7 +15,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/distribution/reference"
 	"github.com/dustin/go-humanize"
@@ -437,10 +436,10 @@ func main() {
 					Usage:   "Number of retries when pushing to registry fails",
 					EnvVars: []string{"PUSH_RETRY_COUNT"},
 				},
-				&cli.StringFlag{
+				&cli.IntFlag{
 					Name:    "push-retry-delay",
-					Value:   "5s",
-					Usage:   "Delay between push retries (e.g. 5s, 1m, 1h)",
+					Value:   5,
+					Usage:   "Delay between push retries in seconds",
 					EnvVars: []string{"PUSH_RETRY_DELAY"},
 				},
 			},
@@ -506,39 +505,9 @@ func main() {
 
 				// Check if this is a reverse conversion (Nydus to OCI)
 				if c.Bool("oci") {
-					// Try to detect if source is a Nydus image by checking for Nydus-specific media types
-					isNydusSource, err := converter.IsNydusImage(context.Background(), c.String("source"), c.Bool("source-insecure"))
-					if err != nil {
-						logrus.Warnf("Failed to detect source image type, assuming OCI to Nydus conversion: %v", err)
-						isNydusSource = false
-					}
-
-					if isNydusSource {
-						// Reverse conversion: Nydus to OCI
-						logrus.Info("Detected Nydus source image, performing reverse conversion to OCI")
-
-						// Parse retry delay
-						retryDelay := c.String("push-retry-delay")
-						if _, err := time.ParseDuration(retryDelay); err != nil {
-							return fmt.Errorf("invalid push retry delay: %v", err)
-						}
-
-						reverseOpt := converter.ReverseOpt{
-							WorkDir:        c.String("work-dir"),
-							NydusImagePath: c.String("nydus-image"),
-							Source:         c.String("source"),
-							Target:         targetRef,
-							SourceInsecure: c.Bool("source-insecure"),
-							TargetInsecure: c.Bool("target-insecure"),
-							AllPlatforms:   c.Bool("all-platforms"),
-							Platforms:      c.String("platform"),
-							OutputJSON:     c.String("output-json"),
-							PushRetryCount: c.Int("push-retry-count"),
-							PushRetryDelay: retryDelay,
-							WithPlainHTTP:  c.Bool("plain-http"),
-						}
-
-						return converter.ReverseConvert(context.Background(), reverseOpt)
+					err, converted := tryReverseConvert(c, targetRef)
+					if converted {
+						return err
 					}
 				}
 
@@ -583,7 +552,7 @@ func main() {
 					OutputJSON:     c.String("output-json"),
 					WithPlainHTTP:  c.Bool("plain-http"),
 					PushRetryCount: c.Int("push-retry-count"),
-					PushRetryDelay: c.String("push-retry-delay"),
+					PushRetryDelay: fmt.Sprintf("%ds", c.Int("push-retry-delay")),
 				}
 
 				return converter.Convert(context.Background(), opt)
@@ -1511,4 +1480,45 @@ func getGlobalFlags() []cli.Flag {
 			EnvVars:  []string{"LOG_FILE"},
 		},
 	}
+}
+
+// tryReverseConvert attempts to perform reverse conversion from Nydus to OCI
+func tryReverseConvert(c *cli.Context, targetRef string) (error, bool) {
+	// Try to detect if the source image is in Nydus format
+	isNydusSource, err := converter.IsNydusImage(context.Background(), c.String("source"), c.Bool("source-insecure"))
+	if err != nil {
+		logrus.Warnf("Failed to detect source image type, assuming OCI to Nydus conversion: %v", err)
+		return nil, false
+	}
+
+	if !isNydusSource {
+		return nil, false
+	}
+
+	// Source image is in Nydus format, perform reverse conversion
+	logrus.Info("Detected Nydus source image, performing reverse conversion to OCI")
+
+	// Parse retry delay parameter (in seconds)
+	retryDelaySeconds := c.Int("push-retry-delay")
+	retryDelay := fmt.Sprintf("%ds", retryDelaySeconds)
+
+	// Build reverse conversion options
+	reverseOpt := converter.ReverseOpt{
+		WorkDir:        c.String("work-dir"),
+		NydusImagePath: c.String("nydus-image"),
+		Source:         c.String("source"),
+		Target:         targetRef,
+		SourceInsecure: c.Bool("source-insecure"),
+		TargetInsecure: c.Bool("target-insecure"),
+		AllPlatforms:   c.Bool("all-platforms"),
+		Platforms:      c.String("platform"),
+		OutputJSON:     c.String("output-json"),
+		PushRetryCount: c.Int("push-retry-count"),
+		PushRetryDelay: retryDelay,
+		WithPlainHTTP:  c.Bool("plain-http"),
+	}
+
+	// Execute reverse conversion
+	err = converter.ReverseConvert(context.Background(), reverseOpt)
+	return err, true
 }

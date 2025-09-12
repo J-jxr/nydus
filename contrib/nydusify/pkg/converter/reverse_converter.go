@@ -18,13 +18,12 @@ import (
 	"strings"
 	"time"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/dragonflyoss/nydus/contrib/nydusify/pkg/converter/provider"
@@ -50,7 +49,7 @@ type ReverseOpt struct {
 	OutputJSON string
 
 	PushRetryCount int
-	PushRetryDelay string
+	PushRetryDelay int
 	WithPlainHTTP  bool
 }
 
@@ -61,7 +60,7 @@ func ReverseConvert(ctx context.Context, opt ReverseOpt) error {
 	ctx = namespaces.WithNamespace(ctx, "nydusify")
 	platformMC, err := platformutil.ParsePlatforms(opt.AllPlatforms, opt.Platforms)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "parse platforms")
 	}
 
 	// Prepare work directory
@@ -88,11 +87,8 @@ func ReverseConvert(ctx context.Context, opt ReverseOpt) error {
 		return err
 	}
 
-	// Parse retry delay
-	retryDelay, err := time.ParseDuration(opt.PushRetryDelay)
-	if err != nil {
-		return errors.Wrap(err, "parse push retry delay")
-	}
+	// Parse retry delay (convert seconds to duration)
+	retryDelay := time.Duration(opt.PushRetryDelay) * time.Second
 
 	// Set push retry configuration
 	pvd.SetPushRetryConfig(opt.PushRetryCount, retryDelay)
@@ -450,16 +446,16 @@ func calculateDigestAndSize(filePath string) (digest.Digest, int64, error) {
 func createOCIConfig(nydusManifest *ocispec.Manifest, ociLayers []ocispec.Descriptor) (*ocispec.Image, error) {
 	// Create basic OCI config
 	config := &ocispec.Image{
-		Created: &time.Time{},
-		Author:  "nydusify reverse converter",
+		Created:      &time.Time{},
+		Author:       "nydusify reverse converter",
 		Architecture: "amd64",
-		OS:      "linux",
+		OS:           "linux",
 		Config: ocispec.ImageConfig{
 			Env: []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 			Cmd: []string{"/bin/sh"},
 		},
 		RootFS: ocispec.RootFS{
-			Type: "layers",
+			Type:    "layers",
 			DiffIDs: make([]digest.Digest, len(ociLayers)),
 		},
 		History: make([]ocispec.History, len(ociLayers)),
