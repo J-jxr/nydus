@@ -132,7 +132,7 @@ func reverseHosts(opt ReverseOpt) func(string) (func(string) (string, string, er
 }
 
 // pullNydusImage pulls Nydus image and extracts layer information
-func pullNydusImage(ctx context.Context, opt ReverseOpt, pvd *provider.Provider, tmpDir string) ([]ocispec.Descriptor, *ocispec.Manifest, error) {
+func pullNydusImage(ctx context.Context, opt ReverseOpt, _ *provider.Provider, tmpDir string) ([]ocispec.Descriptor, *ocispec.Manifest, error) {
 	logrus.Infof("Pulling Nydus image: %s", opt.Source)
 
 	// Create remote for source
@@ -201,7 +201,7 @@ func pullNydusImage(ctx context.Context, opt ReverseOpt, pvd *provider.Provider,
 }
 
 // unpackNydusLayers unpacks Nydus layers using nydus-image unpack command
-func unpackNydusLayers(ctx context.Context, opt ReverseOpt, tmpDir string, nydusLayers []ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+func unpackNydusLayers(_ context.Context, opt ReverseOpt, tmpDir string, nydusLayers []ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 	logrus.Info("Unpacking Nydus layers to OCI format")
 
 	var ociLayers []ocispec.Descriptor
@@ -442,7 +442,7 @@ func calculateDigestAndSize(filePath string) (digest.Digest, int64, error) {
 }
 
 // createOCIConfig creates OCI image configuration
-func createOCIConfig(nydusManifest *ocispec.Manifest, ociLayers []ocispec.Descriptor) (*ocispec.Image, error) {
+func createOCIConfig(_ *ocispec.Manifest, ociLayers []ocispec.Descriptor) (*ocispec.Image, error) {
 	// Use current UTC time
 	now := time.Now().UTC()
 
@@ -478,7 +478,7 @@ func createOCIConfig(nydusManifest *ocispec.Manifest, ociLayers []ocispec.Descri
 }
 
 // pushOCIImage pushes the OCI image to target registry
-func pushOCIImage(ctx context.Context, opt ReverseOpt, pvd *provider.Provider, tmpDir string, config *ocispec.Image, layers []ocispec.Descriptor) error {
+func pushOCIImage(ctx context.Context, opt ReverseOpt, _ *provider.Provider, tmpDir string, config *ocispec.Image, layers []ocispec.Descriptor) error {
 	logrus.Infof("Pushing OCI image to: %s", opt.Target)
 
 	// Create remote for target
