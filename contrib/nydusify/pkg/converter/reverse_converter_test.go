@@ -23,7 +23,7 @@ func TestReverseConvert(t *testing.T) {
 			TargetInsecure: true,
 			Platforms:      "linux/amd64",
 			PushRetryCount: 3,
-			PushRetryDelay: "5s",
+			PushRetryDelay: 5,
 		}
 
 		// This test would require actual registry and nydus-image binary

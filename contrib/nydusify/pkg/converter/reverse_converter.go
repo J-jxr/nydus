@@ -25,7 +25,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/remotes/docker"
 	"github.com/dragonflyoss/nydus/contrib/nydusify/pkg/converter/provider"
 	pkgPvd "github.com/dragonflyoss/nydus/contrib/nydusify/pkg/provider"
 	"github.com/dragonflyoss/nydus/contrib/nydusify/pkg/utils"
@@ -444,12 +443,17 @@ func calculateDigestAndSize(filePath string) (digest.Digest, int64, error) {
 
 // createOCIConfig creates OCI image configuration
 func createOCIConfig(nydusManifest *ocispec.Manifest, ociLayers []ocispec.Descriptor) (*ocispec.Image, error) {
+	// Use current UTC time
+	now := time.Now().UTC()
+
 	// Create basic OCI config
 	config := &ocispec.Image{
-		Created:      &time.Time{},
-		Author:       "nydusify reverse converter",
-		Architecture: "amd64",
-		OS:           "linux",
+		Created: &now,
+		Author:  "nydusify reverse converter",
+		Platform: ocispec.Platform{
+			Architecture: "amd64",
+			OS:           "linux",
+		},
 		Config: ocispec.ImageConfig{
 			Env: []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 			Cmd: []string{"/bin/sh"},
@@ -463,11 +467,9 @@ func createOCIConfig(nydusManifest *ocispec.Manifest, ociLayers []ocispec.Descri
 
 	// Calculate diff IDs for uncompressed layers
 	for i, layer := range ociLayers {
-		// For simplicity, use the same digest as diff ID
-		// In a real implementation, you'd need to calculate the uncompressed digest
 		config.RootFS.DiffIDs[i] = layer.Digest
 		config.History[i] = ocispec.History{
-			Created:   &time.Time{},
+			Created:   &now,
 			CreatedBy: "nydusify reverse converter",
 		}
 	}
@@ -533,7 +535,7 @@ func pushOCIImage(ctx context.Context, opt ReverseOpt, pvd *provider.Provider, t
 
 	// Create and push manifest
 	manifest := ocispec.Manifest{
-		Versions: specs.VersionSpec{
+		Versioned: specs.Versioned{
 			SchemaVersion: 2,
 		},
 		MediaType: ocispec.MediaTypeImageManifest,
@@ -559,35 +561,4 @@ func pushOCIImage(ctx context.Context, opt ReverseOpt, pvd *provider.Provider, t
 	}
 
 	return nil
-}
-
-// IsNydusImage checks if the given image reference is a Nydus image
-// by examining its manifest and media types
-func IsNydusImage(ctx context.Context, ref string, insecure bool) (bool, error) {
-	// Create a simple provider to fetch the manifest
-	hosts := func(domain string) ([]docker.RegistryHost, error) {
-		return []docker.RegistryHost{
-			{
-				Host:         domain,
-				Scheme:       "https",
-				SkipVerify:   insecure,
-				Capabilities: docker.HostCapabilityPull,
-			},
-		}, nil
-	}
-
-	provider := provider.DefaultRemote(ref, hosts)
-	manifest, _, err := provider.Manifest(ctx, ref)
-	if err != nil {
-		return false, err
-	}
-
-	// Check if any layer has Nydus-specific media types
-	for _, layer := range manifest.Layers {
-		if isNydusLayer(layer) {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }

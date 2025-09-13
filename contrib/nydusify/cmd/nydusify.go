@@ -1484,23 +1484,11 @@ func getGlobalFlags() []cli.Flag {
 
 // tryReverseConvert attempts to perform reverse conversion from Nydus to OCI
 func tryReverseConvert(c *cli.Context, targetRef string) (error, bool) {
-	// Try to detect if the source image is in Nydus format
-	isNydusSource, err := converter.IsNydusImage(context.Background(), c.String("source"), c.Bool("source-insecure"))
-	if err != nil {
-		logrus.Warnf("Failed to detect source image type, assuming OCI to Nydus conversion: %v", err)
-		return nil, false
-	}
-
-	if !isNydusSource {
-		return nil, false
-	}
-
 	// Source image is in Nydus format, perform reverse conversion
 	logrus.Info("Detected Nydus source image, performing reverse conversion to OCI")
 
 	// Parse retry delay parameter (in seconds)
 	retryDelaySeconds := c.Int("push-retry-delay")
-	retryDelay := fmt.Sprintf("%ds", retryDelaySeconds)
 
 	// Build reverse conversion options
 	reverseOpt := converter.ReverseOpt{
@@ -1514,11 +1502,11 @@ func tryReverseConvert(c *cli.Context, targetRef string) (error, bool) {
 		Platforms:      c.String("platform"),
 		OutputJSON:     c.String("output-json"),
 		PushRetryCount: c.Int("push-retry-count"),
-		PushRetryDelay: retryDelay,
+		PushRetryDelay: retryDelaySeconds,
 		WithPlainHTTP:  c.Bool("plain-http"),
 	}
 
 	// Execute reverse conversion
-	err = converter.ReverseConvert(context.Background(), reverseOpt)
+	err := converter.ReverseConvert(context.Background(), reverseOpt)
 	return err, true
 }
