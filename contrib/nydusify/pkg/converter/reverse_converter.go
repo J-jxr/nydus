@@ -263,12 +263,15 @@ func unpackNydusLayers(_ context.Context, opt ReverseOpt, tmpDir string, nydusLa
 
 // isNydusLayer checks if a layer is a Nydus layer
 func isNydusLayer(layer ocispec.Descriptor) bool {
+	if layer.MediaType == "application/vnd.oci.image.layer.nydus.blob.v1" {
+		return true
+	}
 	if layer.Annotations == nil {
 		return false
 	}
 	_, hasBootstrap := layer.Annotations["containerd.io/snapshot/nydus-bootstrap"]
 	_, hasBlob := layer.Annotations["containerd.io/snapshot/nydus-blob"]
-	return hasBootstrap || hasBlob || strings.Contains(layer.MediaType, "nydus")
+	return hasBootstrap || hasBlob
 }
 
 // extractNydusLayer extracts bootstrap and blob files from a Nydus layer
