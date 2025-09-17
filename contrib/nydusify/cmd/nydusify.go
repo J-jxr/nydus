@@ -347,8 +347,14 @@ func main() {
 				&cli.BoolFlag{
 					Name:    "oci",
 					Value:   false,
-					Usage:   "Convert to OCI format (if source is Nydus, performs reverse conversion; if source is OCI, converts Docker media types to OCI media types)",
+					Usage:   "Convert Docker media types to OCI media types",
 					EnvVars: []string{"OCI"},
+				},
+				&cli.BoolFlag{
+					Name:    "reverse",
+					Value:   false,
+					Usage:   "Convert to OCI format (if source is Nydus, performs reverse conversion; if source is OCI, converts Docker media types to OCI media types)",
+					EnvVars: []string{"REVERSE"},
 				},
 				&cli.BoolFlag{
 					Name:   "docker-v2-format",
@@ -504,7 +510,7 @@ func main() {
 				}
 
 				// Check if this is a reverse conversion (Nydus to OCI)
-				if c.Bool("oci") {
+				if c.Bool("reverse") {
 					converted, err := tryReverseConvert(c, targetRef)
 					if converted {
 						return err
